@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"net/http"
+	"net/url"
 	"reflect"
 	"sort"
 	"strconv"
@@ -122,6 +124,7 @@ func getSignature(appSecret string, req *tea.Request) string {
 	signStr := tea.StringValue(req.Method) + "\n" + accept + "\n" + contentMd5 + "\n" + contentType + "\n" + date + "\n" + signedHeader + "\n" + url
 	h := hmac.New(func() hash.Hash { return sha256.New() }, []byte(appSecret))
 	io.WriteString(h, signStr)
+	fmt.Println("signStr: ", signStr)
 	signedStr := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return signedStr
 }
@@ -151,18 +154,33 @@ func isFilterKey(key string) bool {
 }
 
 func buildUrl(request *tea.Request) string {
-	url := tea.StringValue(request.Pathname)
+	urlPath := tea.StringValue(request.Pathname)
 	hs := newSorter(request.Query)
-	hs.Sort()
-	if len(hs.Keys) > 0 {
-		url += "?"
-	}
-	for key, value := range hs.Keys {
-		if !strings.HasSuffix(url, "?") {
-			url += "&"
+	if request.Method != nil && *request.Method == http.MethodPost {
+		var (
+			tmp = map[string]*string{}
+			buf bytes.Buffer
+		)
+		io.Copy(&buf, request.Body)
+
+		request.Body = strings.NewReader(buf.String())
+		vals, _ := url.ParseQuery(buf.String())
+		for k, _ := range vals {
+			tmp[k] = tea.String(vals.Get(k))
 		}
-		url += value + "=" + hs.Vals[key]
+		hs = newSorter(tmp)
 	}
 
-	return url
+	hs.Sort()
+	if len(hs.Keys) > 0 {
+		urlPath += "?"
+	}
+	for key, value := range hs.Keys {
+		if !strings.HasSuffix(urlPath, "?") {
+			urlPath += "&"
+		}
+		urlPath += value + "=" + hs.Vals[key]
+	}
+
+	return urlPath
 }

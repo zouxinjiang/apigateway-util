@@ -1,5 +1,5 @@
-module github.com/alibabacloud-go/apigateway-util
+module github.com/zouxinjiang/apigateway-util
 
-go 1.14
+go 1.12
 
 require github.com/alibabacloud-go/tea v1.1.1
